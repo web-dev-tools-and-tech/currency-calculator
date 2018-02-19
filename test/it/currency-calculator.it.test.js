@@ -8,10 +8,14 @@ const app = require('../..')
 describe('currency-calculator it', function() {
   this.retries(global.v8debug || /--inspect/.test(process.execArgv.join(' ')) ? 0 : 3)
 
-  const {baseUrl} = setupApp()
+  let server
+  before(done => {
+    server = app().listen(0, done)
+  })
+  after(done => server.close(done))
 
   it('should return OK on /', async () => {
-    const response = await fetch(`${baseUrl()}/`)
+    const response = await fetch(`http://localhost:${server.address().port}/`)
 
     expect(response.status).to.equal(200)
     expect(await response.text()).to.equal('OK')
@@ -27,15 +31,14 @@ describe('currency-calculator it', function() {
     expect(nextState.display).to.equal('42')
     nextState = await fetchNextCalcState(nextState, '+', {EUR: 2})
     expect(nextState.display).to.equal('42')
-    nextState = await fetchNextCalcState(nextState, '+', {EUR: 2})
-    expect(nextState.display).to.equal('42')
     nextState = await fetchNextCalcState(nextState, '2', {EUR: 2})
     expect(nextState.display).to.equal('2')
     nextState = await fetchNextCalcState(nextState, '=', {EUR: 2})
     expect(nextState.display).to.equal('44')
   })
+
   async function fetchNextCalcState(calculatorState, input, rates) {
-    const response = await fetch(`${baseUrl()}/calculate`, {
+    const response = await fetch(`http://localhost:${server.address().port}/calculate`, {
       method: 'POST',
       body: JSON.stringify({rates, calculatorState, input}),
       headers: {'Content-Type': 'application/json'},
@@ -45,19 +48,3 @@ describe('currency-calculator it', function() {
     return await response.json()
   }
 })
-
-function setupApp() {
-  let server
-
-  before(async () => {
-    await new Promise((resolve, reject) => {
-      server = app({}).listen(err => (err ? reject(err) : resolve()))
-    })
-  })
-  after(done => server.close(done))
-
-  return {
-    baseUrl: () => `http://localhost:${server.address().port}`,
-    address: () => `localhost:${server.address().port}`,
-  }
-}
